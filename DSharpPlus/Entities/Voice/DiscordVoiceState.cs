@@ -170,7 +170,7 @@ namespace DSharpPlus.Entities
 
             this.UserId = m.Id;
             this.ChannelId = 0;
-            this.GuildId = m._guild_id;
+            this.GuildId = m._guildId;
 
             this.IsServerDeafened = m.IsDeafened;
             this.IsServerMuted = m.IsMuted;

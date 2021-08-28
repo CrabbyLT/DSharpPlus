@@ -144,11 +144,11 @@ namespace DSharpPlus
                     this.Logger.LogWarning(LoggerEvents.Misc, "You are logging in with a token that is not a bot token. This is not officially supported by Discord, and can result in your account being terminated if you aren't careful.");
                 this.Logger.LogInformation(LoggerEvents.Startup, "DSharpPlus, version {0}", this._versionString.Value);
 
-                var shardc = await this.InitializeShardsAsync().ConfigureAwait(false);
+                var shardCount = await this.InitializeShardsAsync().ConfigureAwait(false);
                 var connectTasks = new List<Task>();
-                this.Logger.LogInformation(LoggerEvents.ShardStartup, "Booting {0} shards.", shardc);
+                this.Logger.LogInformation(LoggerEvents.ShardStartup, "Booting {0} shards.", shardCount);
 
-                for (var i = 0; i < shardc; i++)
+                for (var i = 0; i < shardCount; i++)
                 {
                     //This should never happen, but in case it does...
                     if (this.GatewayInfo.SessionBucket.MaxConcurrency < 1)
@@ -169,14 +169,14 @@ namespace DSharpPlus
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 await this.InternalStopAsync(false).ConfigureAwait(false);
 
                 var message = $"Shard initialization failed, check inner exceptions for details: ";
 
-                this.Logger.LogCritical(LoggerEvents.ShardClientError, $"{message}\n{ex}");
-                throw new AggregateException(message, ex);
+                this.Logger.LogCritical(LoggerEvents.ShardClientError, $"{message}\n{exception}");
+                throw new AggregateException(message, exception);
             }
         }
         /// <summary>
@@ -198,9 +198,9 @@ namespace DSharpPlus
         /// <returns>The found <see cref="DiscordClient"/> shard. Otherwise <see langword="null"/> if the shard was not found for the guild ID.</returns>
         public DiscordClient GetShard(ulong guildId)
         {
-            var index = this._manuallySharding ? this.GetShardIdFromGuilds(guildId) : Utilities.GetShardId(guildId, this.ShardClients.Count);
+            var shardId = this._manuallySharding ? this.GetShardIdFromGuilds(guildId) : Utilities.GetShardId(guildId, this.ShardClients.Count);
 
-            return index != -1 ? this._shards[index] : null;
+            return shardId != -1 ? this._shards[shardId] : null;
         }
 
         /// <summary>
@@ -241,15 +241,15 @@ namespace DSharpPlus
                 return this._shards.Count;
 
             this.GatewayInfo = await this.GetGatewayInfoAsync().ConfigureAwait(false);
-            var shardc = this.Configuration.ShardCount == 1 ? this.GatewayInfo.ShardCount : this.Configuration.ShardCount;
-            var lf = new ShardedLoggerFactory(this.Logger);
-            for (var i = 0; i < shardc; i++)
+            var shardCount = this.Configuration.ShardCount == 1 ? this.GatewayInfo.ShardCount : this.Configuration.ShardCount;
+            var shardedLoggerFactory = new ShardedLoggerFactory(this.Logger);
+            for (var i = 0; i < shardCount; i++)
             {
                 var cfg = new DiscordConfiguration(this.Configuration)
                 {
                     ShardId = i,
-                    ShardCount = shardc,
-                    LoggerFactory = lf
+                    ShardCount = shardCount,
+                    LoggerFactory = shardedLoggerFactory
                 };
 
                 var client = new DiscordClient(cfg);
@@ -257,7 +257,7 @@ namespace DSharpPlus
                     throw new InvalidOperationException("Could not initialize shards.");
             }
 
-            return shardc;
+            return shardCount;
         }
 
         #endregion
@@ -266,67 +266,67 @@ namespace DSharpPlus
 
         private async Task<GatewayInfo> GetGatewayInfoAsync()
         {
-            var url = $"{Utilities.GetApiBaseUri()}{Endpoints.GATEWAY}{Endpoints.BOT}";
-            var http = new HttpClient();
+            var botGatewayEndpoint = $"{Utilities.GetApiBaseUri()}{Endpoints.GATEWAY}{Endpoints.BOT}";
+            var httpClient = new HttpClient();
 
-            http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", Utilities.GetUserAgent());
-            http.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", Utilities.GetFormattedToken(this.Configuration));
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", Utilities.GetUserAgent());
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", Utilities.GetFormattedToken(this.Configuration));
 
             this.Logger.LogDebug(LoggerEvents.ShardRest, $"Obtaining gateway information from GET {Endpoints.GATEWAY}{Endpoints.BOT}...");
-            var resp = await http.GetAsync(url).ConfigureAwait(false);
+            var httpResponseMessage = await httpClient.GetAsync(botGatewayEndpoint).ConfigureAwait(false);
 
-            http.Dispose();
+            httpClient.Dispose();
 
-            if (!resp.IsSuccessStatusCode)
+            if (!httpResponseMessage.IsSuccessStatusCode)
             {
-                var ratelimited = await HandleHttpError(url, resp).ConfigureAwait(false);
+                var rateLimited = await HandleHttpError(botGatewayEndpoint, httpResponseMessage).ConfigureAwait(false);
 
-                if (ratelimited)
+                if (rateLimited)
                     return await this.GetGatewayInfoAsync().ConfigureAwait(false);
             }
 
             var timer = new Stopwatch();
             timer.Start();
 
-            var jo = JObject.Parse(await resp.Content.ReadAsStringAsync().ConfigureAwait(false));
-            var info = jo.ToObject<GatewayInfo>();
+            var httpResponseMessageContent = JObject.Parse(await httpResponseMessage.Content.ReadAsStringAsync().ConfigureAwait(false));
+            var gatewayInfo = httpResponseMessageContent.ToObject<GatewayInfo>();
 
             //There is a delay from parsing here.
             timer.Stop();
 
-            info.SessionBucket.resetAfter -= (int)timer.ElapsedMilliseconds;
-            info.SessionBucket.ResetAfter = DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(info.SessionBucket.resetAfter);
+            gatewayInfo.SessionBucket.resetAfter -= (int)timer.ElapsedMilliseconds;
+            gatewayInfo.SessionBucket.ResetAfter = DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(gatewayInfo.SessionBucket.resetAfter);
 
-            return info;
+            return gatewayInfo;
 
-            async Task<bool> HandleHttpError(string reqUrl, HttpResponseMessage msg)
+            async Task<bool> HandleHttpError(string requesturl, HttpResponseMessage httpResponseMessage)
             {
-                var code = (int)msg.StatusCode;
+                var statusCode = (int)httpResponseMessage.StatusCode;
 
-                if (code == 401 || code == 403)
+                if (statusCode == 401 || statusCode == 403)
                 {
-                    throw new Exception($"Authentication failed, check your token and try again: {code} {msg.ReasonPhrase}");
+                    throw new Exception($"Authentication failed, check your token and try again: {statusCode} {httpResponseMessage.ReasonPhrase}");
                 }
-                else if (code == 429)
+                else if (statusCode == 429)
                 {
-                    this.Logger.LogError(LoggerEvents.ShardClientError, $"Ratelimit hit, requeuing request to {reqUrl}");
+                    this.Logger.LogError(LoggerEvents.ShardClientError, $"Ratelimit hit, requeuing request to {requesturl}");
 
-                    var hs = msg.Headers.ToDictionary(xh => xh.Key, xh => string.Join("\n", xh.Value), StringComparer.OrdinalIgnoreCase);
+                    var responseMessageHeaders = httpResponseMessage.Headers.ToDictionary(xh => xh.Key, xh => string.Join("\n", xh.Value), StringComparer.OrdinalIgnoreCase);
                     var waitInterval = 0;
 
-                    if (hs.TryGetValue("Retry-After", out var retry_after_raw))
-                        waitInterval = int.Parse(retry_after_raw, CultureInfo.InvariantCulture);
+                    if (responseMessageHeaders.TryGetValue("Retry-After", out var retryAfterRaw))
+                        waitInterval = int.Parse(retryAfterRaw, CultureInfo.InvariantCulture);
 
                     await Task.Delay(waitInterval).ConfigureAwait(false);
                     return true;
                 }
-                else if (code >= 500)
+                else if (statusCode >= 500)
                 {
-                    throw new Exception($"Internal Server Error: {code} {msg.ReasonPhrase}");
+                    throw new Exception($"Internal Server Error: {statusCode} {httpResponseMessage.ReasonPhrase}");
                 }
                 else
                 {
-                    throw new Exception($"An unsuccessful HTTP status code was encountered: {code} {msg.ReasonPhrase}");
+                    throw new Exception($"An unsuccessful HTTP status code was encountered: {statusCode} {httpResponseMessage.ReasonPhrase}");
                 }
             }
         }
@@ -334,19 +334,19 @@ namespace DSharpPlus
 
         private readonly Lazy<string> _versionString = new(() =>
         {
-            var a = typeof(DiscordShardedClient).GetTypeInfo().Assembly;
+            var discordShardedClientAssembly = typeof(DiscordShardedClient).GetTypeInfo().Assembly;
 
-            var iv = a.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-            if (iv != null)
-                return iv.InformationalVersion;
+            var shardedClientAssemblyVersionAttribute = discordShardedClientAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            if (shardedClientAssemblyVersionAttribute != null)
+                return shardedClientAssemblyVersionAttribute.InformationalVersion;
 
-            var v = a.GetName().Version;
-            var vs = v.ToString(3);
+            var shardedClientVersion = discordShardedClientAssembly.GetName().Version;
+            var versionString = shardedClientVersion.ToString(3);
 
-            if (v.Revision > 0)
-                vs = $"{vs}, CI build {v.Revision}";
+            if (shardedClientVersion.Revision > 0)
+                versionString = $"{versionString}, CI build {shardedClientVersion.Revision}";
 
-            return vs;
+            return versionString;
         });
 
 
@@ -354,10 +354,10 @@ namespace DSharpPlus
 
         #region Private Connection Methods
 
-        private async Task ConnectShardAsync(int i)
+        private async Task ConnectShardAsync(int shardIndex)
         {
-            if (!this._shards.TryGetValue(i, out var client))
-                throw new Exception($"Could not initialize shard {i}.");
+            if (!this._shards.TryGetValue(shardIndex, out var client))
+                throw new Exception($"Could not initialize shard {shardIndex}.");
 
             if (this.GatewayInfo != null)
             {
@@ -374,14 +374,14 @@ namespace DSharpPlus
             if (this._internalVoiceRegions != null)
             {
                 client.InternalVoiceRegions = this._internalVoiceRegions;
-                client._voice_regions_lazy = new Lazy<IReadOnlyDictionary<string, DiscordVoiceRegion>>(() => new ReadOnlyDictionary<string, DiscordVoiceRegion>(client.InternalVoiceRegions));
+                client._voiceRegionsLazy = new Lazy<IReadOnlyDictionary<string, DiscordVoiceRegion>>(() => new ReadOnlyDictionary<string, DiscordVoiceRegion>(client.InternalVoiceRegions));
             }
 
             this.HookEventHandlers(client);
 
             client._isShard = true;
             await client.ConnectAsync().ConfigureAwait(false);
-            this.Logger.LogInformation(LoggerEvents.ShardStartup, "Booted shard {0}.", i);
+            this.Logger.LogInformation(LoggerEvents.ShardStartup, "Booted shard {0}.", shardIndex);
 
             if (this.CurrentUser == null)
                 this.CurrentUser = client.CurrentUser;
@@ -630,11 +630,11 @@ namespace DSharpPlus
 
         private int GetShardIdFromGuilds(ulong id)
         {
-            foreach (var s in this._shards.Values)
+            foreach (var shardClient in this._shards.Values)
             {
-                if (s._guilds.TryGetValue(id, out _))
+                if (shardClient._guilds.TryGetValue(id, out _))
                 {
-                    return s.ShardId;
+                    return shardClient.ShardId;
                 }
             }
 

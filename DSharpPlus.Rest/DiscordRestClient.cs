@@ -258,7 +258,7 @@ namespace DSharpPlus
                     this.UpdateUserCache(usr);
                 }
 
-                recmbr.AddRange(tms.Select(xtm => new DiscordMember(xtm) { Discord = this, _guild_id = guild_id }));
+                recmbr.AddRange(tms.Select(xtm => new DiscordMember(xtm) { Discord = this, _guildId = guild_id }));
             }
 
             return new ReadOnlyCollection<DiscordMember>(recmbr);

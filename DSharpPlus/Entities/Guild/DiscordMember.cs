@@ -41,7 +41,7 @@ namespace DSharpPlus.Entities
     {
         internal DiscordMember()
         {
-            this._role_ids_lazy = new Lazy<IReadOnlyList<ulong>>(() => new ReadOnlyCollection<ulong>(this._role_ids));
+            this._role_ids_lazy = new Lazy<IReadOnlyList<ulong>>(() => new ReadOnlyCollection<ulong>(this._roleIds));
         }
 
         internal DiscordMember(DiscordUser user)
@@ -50,8 +50,8 @@ namespace DSharpPlus.Entities
 
             this.Id = user.Id;
 
-            this._role_ids = new List<ulong>();
-            this._role_ids_lazy = new Lazy<IReadOnlyList<ulong>>(() => new ReadOnlyCollection<ulong>(this._role_ids));
+            this._roleIds = new List<ulong>();
+            this._role_ids_lazy = new Lazy<IReadOnlyList<ulong>>(() => new ReadOnlyCollection<ulong>(this._roleIds));
         }
 
         internal DiscordMember(TransportMember mbr)
@@ -64,8 +64,8 @@ namespace DSharpPlus.Entities
             this.PremiumSince = mbr.PremiumSince;
             this.IsPending = mbr.IsPending;
             this._avatarHash = mbr.AvatarHash;
-            this._role_ids = mbr.Roles ?? new List<ulong>();
-            this._role_ids_lazy = new Lazy<IReadOnlyList<ulong>>(() => new ReadOnlyCollection<ulong>(this._role_ids));
+            this._roleIds = mbr.Roles ?? new List<ulong>();
+            this._role_ids_lazy = new Lazy<IReadOnlyList<ulong>>(() => new ReadOnlyCollection<ulong>(this._roleIds));
         }
 
         /// <summary>
@@ -79,7 +79,7 @@ namespace DSharpPlus.Entities
         /// </summary>
         [JsonIgnore]
         public string GuildAvatarUrl
-            => !string.IsNullOrWhiteSpace(this.GuildAvatarHash) ? (this.GuildAvatarHash.StartsWith("a_") ? $"https://cdn.discordapp.com{Endpoints.GUILDS}/{this._guild_id}{Endpoints.USERS}/{this.Id}{Endpoints.AVATARS}/{this.GuildAvatarHash}.gif?size=1024" : $"https://cdn.discordapp.com{Endpoints.GUILDS}/{this._guild_id}{Endpoints.USERS}/{this.Id}{Endpoints.AVATARS}/{this.GuildAvatarHash}.png?size=1024") : this.DefaultAvatarUrl;
+            => !string.IsNullOrWhiteSpace(this.GuildAvatarHash) ? (this.GuildAvatarHash.StartsWith("a_") ? $"https://cdn.discordapp.com{Endpoints.GUILDS}/{this._guildId}{Endpoints.USERS}/{this.Id}{Endpoints.AVATARS}/{this.GuildAvatarHash}.gif?size=1024" : $"https://cdn.discordapp.com{Endpoints.GUILDS}/{this._guildId}{Endpoints.USERS}/{this.Id}{Endpoints.AVATARS}/{this.GuildAvatarHash}.png?size=1024") : this.DefaultAvatarUrl;
 
         [JsonIgnore]
         internal string _avatarHash;
@@ -105,7 +105,7 @@ namespace DSharpPlus.Entities
             => this._role_ids_lazy.Value;
 
         [JsonProperty("roles", NullValueHandling = NullValueHandling.Ignore)]
-        internal List<ulong> _role_ids;
+        internal List<ulong> _roleIds;
         [JsonIgnore]
         private readonly Lazy<IReadOnlyList<ulong>> _role_ids_lazy;
 
@@ -164,17 +164,17 @@ namespace DSharpPlus.Entities
         /// </summary>
         [JsonIgnore]
         public DiscordVoiceState VoiceState
-            => this.Discord.Guilds[this._guild_id].VoiceStates.TryGetValue(this.Id, out var voiceState) ? voiceState : null;
+            => this.Discord.Guilds[this._guildId].VoiceStates.TryGetValue(this.Id, out var voiceState) ? voiceState : null;
 
         [JsonIgnore]
-        internal ulong _guild_id = 0;
+        internal ulong _guildId = 0;
 
         /// <summary>
         /// Gets the guild of which this member is a part of.
         /// </summary>
         [JsonIgnore]
         public DiscordGuild Guild
-            => this.Discord.Guilds[this._guild_id];
+            => this.Discord.Guilds[this._guildId];
 
         /// <summary>
         /// Gets whether this member is the Guild owner.
@@ -422,7 +422,7 @@ namespace DSharpPlus.Entities
         /// <exception cref="Exceptions.BadRequestException">Thrown when an invalid parameter was provided.</exception>
         /// <exception cref="Exceptions.ServerErrorException">Thrown when Discord is unable to process the request.</exception>
         public Task SetMuteAsync(bool mute, string reason = null)
-            => this.Discord.ApiClient.ModifyGuildMemberAsync(this._guild_id, this.Id, default, default, mute, default, default, reason);
+            => this.Discord.ApiClient.ModifyGuildMemberAsync(this._guildId, this.Id, default, default, mute, default, default, reason);
 
         /// <summary>
         /// Sets this member's voice deaf status.
@@ -435,7 +435,7 @@ namespace DSharpPlus.Entities
         /// <exception cref="Exceptions.BadRequestException">Thrown when an invalid parameter was provided.</exception>
         /// <exception cref="Exceptions.ServerErrorException">Thrown when Discord is unable to process the request.</exception>
         public Task SetDeafAsync(bool deaf, string reason = null)
-            => this.Discord.ApiClient.ModifyGuildMemberAsync(this._guild_id, this.Id, default, default, default, deaf, default, reason);
+            => this.Discord.ApiClient.ModifyGuildMemberAsync(this._guildId, this.Id, default, default, default, deaf, default, reason);
 
         /// <summary>
         /// Modifies this member.
@@ -541,7 +541,7 @@ namespace DSharpPlus.Entities
         /// <exception cref="Exceptions.BadRequestException">Thrown when an invalid parameter was provided.</exception>
         /// <exception cref="Exceptions.ServerErrorException">Thrown when Discord is unable to process the request.</exception>
         public Task RemoveAsync(string reason = null)
-            => this.Discord.ApiClient.RemoveGuildMemberAsync(this._guild_id, this.Id, reason);
+            => this.Discord.ApiClient.RemoveGuildMemberAsync(this._guildId, this.Id, reason);
 
         /// <summary>
         /// Moves this member to the specified voice channel
@@ -601,7 +601,7 @@ namespace DSharpPlus.Entities
             if (e is null)
                 return false;
 
-            return ReferenceEquals(this, e) ? true : this.Id == e.Id && this._guild_id == e._guild_id;
+            return ReferenceEquals(this, e) ? true : this.Id == e.Id && this._guildId == e._guildId;
         }
 
         /// <summary>
@@ -613,7 +613,7 @@ namespace DSharpPlus.Entities
             var hash = 13;
 
             hash = (hash * 7) + this.Id.GetHashCode();
-            hash = (hash * 7) + this._guild_id.GetHashCode();
+            hash = (hash * 7) + this._guildId.GetHashCode();
 
             return hash;
         }
@@ -632,7 +632,7 @@ namespace DSharpPlus.Entities
             if ((o1 == null && o2 != null) || (o1 != null && o2 == null))
                 return false;
 
-            return o1 == null && o2 == null ? true : e1.Id == e2.Id && e1._guild_id == e2._guild_id;
+            return o1 == null && o2 == null ? true : e1.Id == e2.Id && e1._guildId == e2._guildId;
         }
 
         /// <summary>

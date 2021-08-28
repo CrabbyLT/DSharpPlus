@@ -983,7 +983,7 @@ namespace DSharpPlus.Entities
 
                     usr = this.Discord.UpdateUserCache(usr);
 
-                    recmbr.Add(new DiscordMember(xtm) { Discord = this.Discord, _guild_id = this.Id });
+                    recmbr.Add(new DiscordMember(xtm) { Discord = this.Discord, _guildId = this.Id });
                 }
 
                 var tm = tms.LastOrDefault();
@@ -1128,7 +1128,7 @@ namespace DSharpPlus.Entities
                 .GroupBy(xh => xh.Id)
                 .Select(xgh => xgh.First());
 
-            var ams = amr.Select(xau => (this._members != null && this._members.TryGetValue(xau.Id, out var member)) ? member : new DiscordMember { Discord = this.Discord, Id = xau.Id, _guild_id = this.Id });
+            var ams = amr.Select(xau => (this._members != null && this._members.TryGetValue(xau.Id, out var member)) ? member : new DiscordMember { Discord = this.Discord, Id = xau.Id, _guildId = this.Id });
             var amd = ams.ToDictionary(xm => xm.Id, xm => xm);
 
             Dictionary<ulong, DiscordWebhook> ahd = null;
@@ -1427,7 +1427,7 @@ namespace DSharpPlus.Entities
                     case AuditLogActionType.Kick:
                         entry = new DiscordAuditLogKickEntry
                         {
-                            Target = amd.TryGetValue(xac.TargetId.Value, out var kickMember) ? kickMember : new DiscordMember { Id = xac.TargetId.Value, Discord = this.Discord, _guild_id = this.Id }
+                            Target = amd.TryGetValue(xac.TargetId.Value, out var kickMember) ? kickMember : new DiscordMember { Id = xac.TargetId.Value, Discord = this.Discord, _guildId = this.Id }
                         };
                         break;
 
@@ -1443,7 +1443,7 @@ namespace DSharpPlus.Entities
                     case AuditLogActionType.Unban:
                         entry = new DiscordAuditLogBanEntry
                         {
-                            Target = amd.TryGetValue(xac.TargetId.Value, out var unbanMember) ? unbanMember : new DiscordMember { Id = xac.TargetId.Value, Discord = this.Discord, _guild_id = this.Id }
+                            Target = amd.TryGetValue(xac.TargetId.Value, out var unbanMember) ? unbanMember : new DiscordMember { Id = xac.TargetId.Value, Discord = this.Discord, _guildId = this.Id }
                         };
                         break;
 
@@ -1451,7 +1451,7 @@ namespace DSharpPlus.Entities
                     case AuditLogActionType.MemberRoleUpdate:
                         entry = new DiscordAuditLogMemberUpdateEntry
                         {
-                            Target = amd.TryGetValue(xac.TargetId.Value, out var roleUpdMember) ? roleUpdMember : new DiscordMember { Id = xac.TargetId.Value, Discord = this.Discord, _guild_id = this.Id }
+                            Target = amd.TryGetValue(xac.TargetId.Value, out var roleUpdMember) ? roleUpdMember : new DiscordMember { Id = xac.TargetId.Value, Discord = this.Discord, _guildId = this.Id }
                         };
 
                         var entrymbu = entry as DiscordAuditLogMemberUpdateEntry;
@@ -1626,8 +1626,8 @@ namespace DSharpPlus.Entities
 
                                     entryinv.InviterChange = new PropertyChange<DiscordMember>
                                     {
-                                        Before = amd.TryGetValue(t1, out var propBeforeMember) ? propBeforeMember : new DiscordMember { Id = t1, Discord = this.Discord, _guild_id = this.Id },
-                                        After = amd.TryGetValue(t2, out var propAfterMember) ? propAfterMember : new DiscordMember { Id = t1, Discord = this.Discord, _guild_id = this.Id },
+                                        Before = amd.TryGetValue(t1, out var propBeforeMember) ? propBeforeMember : new DiscordMember { Id = t1, Discord = this.Discord, _guildId = this.Id },
+                                        After = amd.TryGetValue(t2, out var propAfterMember) ? propAfterMember : new DiscordMember { Id = t1, Discord = this.Discord, _guildId = this.Id },
                                     };
                                     break;
 

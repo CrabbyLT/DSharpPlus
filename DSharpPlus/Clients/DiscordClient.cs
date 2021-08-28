@@ -764,9 +764,7 @@ namespace DSharpPlus
 
         internal DiscordChannel InternalGetCachedChannel(ulong channelId)
         {
-            DiscordDmChannel foundDmChannel = default;
-
-            if (this._privateChannels?.TryGetValue(channelId, out foundDmChannel) == true)
+            if (this._privateChannels?.TryGetValue(channelId, out var foundDmChannel) == true)
                 return foundDmChannel;
 
             foreach (var guild in this.Guilds.Values)
@@ -791,12 +789,12 @@ namespace DSharpPlus
         {
             if (author != null)
             {
-                var usr = new DiscordUser(author) { Discord = this };
+                var user = new DiscordUser(author) { Discord = this };
 
                 if (member != null)
                     member.User = author;
 
-                message.Author = this.UpdateUser(usr, guild?.Id, guild, member);
+                message.Author = this.UpdateUser(user, guild?.Id, guild, member);
             }
 
             var channel = this.InternalGetCachedChannel(message.ChannelId);
@@ -820,17 +818,17 @@ namespace DSharpPlus
             message.Channel = channel;
         }
 
-        private DiscordUser UpdateUser(DiscordUser usr, ulong? guildId, DiscordGuild guild, TransportMember mbr)
+        private DiscordUser UpdateUser(DiscordUser user, ulong? guildId, DiscordGuild guild, TransportMember transportMember)
         {
-            if (mbr != null)
+            if (transportMember != null)
             {
-                if (mbr.User != null)
+                if (transportMember.User != null)
                 {
-                    usr = new DiscordUser(mbr.User) { Discord = this };
+                    user = new DiscordUser(transportMember.User) { Discord = this };
 
-                    this.UpdateUserCache( usr);
+                    this.UpdateUserCache( user);
 
-                    usr = new DiscordMember(mbr) { Discord = this, _guild_id = guildId.Value };
+                    user = new DiscordMember(transportMember) { Discord = this, _guildId = guildId.Value };
                 }
 
                 var intents = this.Configuration.Intents;
@@ -839,28 +837,28 @@ namespace DSharpPlus
 
                 if (!intents.HasAllPrivilegedIntents() || guild.IsLarge) // we have the necessary privileged intents, no need to worry about caching here unless guild is large.
                 {
-                    if (guild?._members.TryGetValue(usr.Id, out member) == false)
+                    if (guild?._members.TryGetValue(user.Id, out member) == false)
                     {
                         if (intents.HasIntent(DiscordIntents.GuildMembers) || this.Configuration.AlwaysCacheMembers) // member can be updated by events, so cache it
                         {
-                            guild._members.TryAdd(usr.Id, (DiscordMember)usr);
+                            guild._members.TryAdd(user.Id, (DiscordMember)user);
                         }
                     }
                     else if (intents.HasIntent(DiscordIntents.GuildPresences) || this.Configuration.AlwaysCacheMembers) // we can attempt to update it if it's already in cache.
                     {
                         if (!intents.HasIntent(DiscordIntents.GuildMembers)) // no need to update if we already have the member events
                         {
-                            _ = guild._members.TryUpdate(usr.Id, (DiscordMember)usr, member);
+                            _ = guild._members.TryUpdate(user.Id, (DiscordMember)user, member);
                         }
                     }
                 }
             }
-            else if (usr.Username != null) // check if not a skeleton user
+            else if (user.Username != null) // check if not a skeleton user
             {
-                this.UpdateUserCache(usr);
+                this.UpdateUserCache(user);
             }
 
-            return usr;
+            return user;
         }
 
         private void UpdateCachedGuild(DiscordGuild newGuild, JArray rawMembers)
@@ -899,14 +897,14 @@ namespace DSharpPlus
             {
                 guild._members.Clear();
 
-                foreach (var xj in rawMembers)
+                foreach (var rawMemeber in rawMembers)
                 {
-                    var xtm = xj.ToDiscordObject<TransportMember>();
+                    var transportMember = rawMemeber.ToDiscordObject<TransportMember>();
 
-                    var xu = new DiscordUser(xtm.User) { Discord = this };
-                    this.UpdateUserCache(xu);
+                    var user = new DiscordUser(transportMember.User) { Discord = this };
+                    this.UpdateUserCache(user);
 
-                    guild._members[xtm.User.Id] = new DiscordMember(xtm) { Discord = this, _guild_id = guild.Id };
+                    guild._members[transportMember.User.Id] = new DiscordMember(transportMember) { Discord = this, _guildId = guild.Id };
                 }
             }
 
@@ -914,7 +912,7 @@ namespace DSharpPlus
             {
                 if (guild._roles.TryGetValue(role.Id, out _)) continue;
 
-                role._guild_id = guild.Id;
+                role._guildId = guild.Id;
                 guild._roles[role.Id] = role;
             }
 
@@ -970,8 +968,8 @@ namespace DSharpPlus
 
             if (message._reactions == null)
                 message._reactions = new List<DiscordReaction>();
-            foreach (var xr in message._reactions)
-                xr.Emoji.Discord = this;
+            foreach (var reaction in message._reactions)
+                reaction.Emoji.Discord = this;
 
             if (this.Configuration.MessageCacheSize > 0 && message.Channel != null)
                 this.MessageCache?.Add(message);
@@ -986,7 +984,6 @@ namespace DSharpPlus
         {
             this.Dispose();
         }
-
 
         private bool _disposed;
         /// <summary>

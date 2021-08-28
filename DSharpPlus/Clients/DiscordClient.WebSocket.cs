@@ -44,7 +44,7 @@ namespace DSharpPlus
         private DateTimeOffset _lastHeartbeat;
         private Task _heartbeatTask;
 
-        internal static DateTimeOffset DiscordEpoch = new(2015, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        internal static DateTimeOffset _discordEpoch = new(2015, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
         private int _skippedHeartbeats = 0;
         private long _lastSequence;
@@ -112,10 +112,10 @@ namespace DSharpPlus
             }
             else
             {
-                var pr = this._presences[this.CurrentUser.Id];
-                pr.RawActivity = new TransportActivity();
-                pr.Activity = new DiscordActivity();
-                pr.Status = UserStatus.Online;
+                var userPresence = this._presences[this.CurrentUser.Id];
+                userPresence.RawActivity = new TransportActivity();
+                userPresence.Activity = new DiscordActivity();
+                userPresence.Status = UserStatus.Online;
             }
 
             Volatile.Write(ref this._skippedHeartbeats, 0);
@@ -133,54 +133,54 @@ namespace DSharpPlus
             this._webSocketClient.MessageReceived += SocketOnMessage;
             this._webSocketClient.ExceptionThrown += SocketOnException;
 
-            var gwuri = new QueryUriBuilder(this.GatewayUri)
+            var queryUriBuilder = new QueryUriBuilder(this.GatewayUri)
                 .AddParameter("v", "8")
                 .AddParameter("encoding", "json");
 
             if (this.Configuration.GatewayCompressionLevel == GatewayCompressionLevel.Stream)
-                gwuri.AddParameter("compress", "zlib-stream");
+                queryUriBuilder.AddParameter("compress", "zlib-stream");
 
-            await this._webSocketClient.ConnectAsync(gwuri.Build()).ConfigureAwait(false);
+            await this._webSocketClient.ConnectAsync(queryUriBuilder.Build()).ConfigureAwait(false);
 
-            Task SocketOnConnect(IWebSocketClient sender, SocketEventArgs e)
-                => this._socketOpened.InvokeAsync(this, e);
+            Task SocketOnConnect(IWebSocketClient sender, SocketEventArgs eventArgs)
+                => this._socketOpened.InvokeAsync(this, eventArgs);
 
-            async Task SocketOnMessage(IWebSocketClient sender, SocketMessageEventArgs e)
+            async Task SocketOnMessage(IWebSocketClient sender, SocketMessageEventArgs eventArgs)
             {
-                string msg = null;
-                if (e is SocketTextMessageEventArgs etext)
+                string message = null;
+                if (eventArgs is SocketTextMessageEventArgs socketTextEventArgs)
                 {
-                    msg = etext.Message;
+                    message = socketTextEventArgs.Message;
                 }
-                else if (e is SocketBinaryMessageEventArgs ebin) // :DDDD
+                else if (eventArgs is SocketBinaryMessageEventArgs socketBinaryEventArgs)
                 {
-                    using var ms = new MemoryStream();
-                    if (!this._payloadDecompressor.TryDecompress(new ArraySegment<byte>(ebin.Message), ms))
+                    using var memoryStream = new MemoryStream();
+                    if (!this._payloadDecompressor.TryDecompress(new ArraySegment<byte>(socketBinaryEventArgs.Message), memoryStream))
                     {
                         this.Logger.LogError(LoggerEvents.WebSocketReceiveFailure, "Payload decompression failed");
                         return;
                     }
 
-                    ms.Position = 0;
-                    using var sr = new StreamReader(ms, Utilities.UTF8);
-                    msg = await sr.ReadToEndAsync().ConfigureAwait(false);
+                    memoryStream.Position = 0;
+                    using var streamReader = new StreamReader(memoryStream, Utilities.UTF8);
+                    message = await streamReader.ReadToEndAsync().ConfigureAwait(false);
                 }
 
                 try
                 {
-                    this.Logger.LogTrace(LoggerEvents.GatewayWsRx, msg);
-                    await this.HandleSocketMessageAsync(msg);
+                    this.Logger.LogTrace(LoggerEvents.GatewayWsRx, message);
+                    await this.HandleSocketMessageAsync(message);
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    this.Logger.LogError(LoggerEvents.WebSocketReceiveFailure, ex, "Socket handler suppressed an exception");
+                    this.Logger.LogError(LoggerEvents.WebSocketReceiveFailure, exception, "Socket handler suppressed an exception");
                 }
             }
 
-            Task SocketOnException(IWebSocketClient sender, SocketErrorEventArgs e)
-                => this._socketErrored.InvokeAsync(this, e);
+            Task SocketOnException(IWebSocketClient sender, SocketErrorEventArgs eventArgs)
+                => this._socketErrored.InvokeAsync(this, eventArgs);
 
-            async Task SocketOnDisconnect(IWebSocketClient sender, SocketCloseEventArgs e)
+            async Task SocketOnDisconnect(IWebSocketClient sender, SocketCloseEventArgs eventArgs)
             {
                 // release session and connection
                 this.ConnectionLock.Set();
@@ -189,14 +189,12 @@ namespace DSharpPlus
                 if (!this._disposed)
                     this._cancelTokenSource.Cancel();
 
-                this.Logger.LogDebug(LoggerEvents.ConnectionClose, "Connection closed ({0}, '{1}')", e.CloseCode, e.CloseMessage);
-                await this._socketClosed.InvokeAsync(this, e).ConfigureAwait(false);
+                this.Logger.LogDebug(LoggerEvents.ConnectionClose, "Connection closed ({0}, '{1}')", eventArgs.CloseCode, eventArgs.CloseMessage);
+                await this._socketClosed.InvokeAsync(this, eventArgs).ConfigureAwait(false);
 
-
-
-                if (this.Configuration.AutoReconnect && (e.CloseCode < 4001 || e.CloseCode >= 5000))
+                if (this.Configuration.AutoReconnect && (eventArgs.CloseCode < 4001 || eventArgs.CloseCode >= 5000))
                 {
-                    this.Logger.LogCritical(LoggerEvents.ConnectionClose, "Connection terminated ({0}, '{1}'), reconnecting", e.CloseCode, e.CloseMessage);
+                    this.Logger.LogCritical(LoggerEvents.ConnectionClose, "Connection terminated ({0}, '{1}'), reconnecting", eventArgs.CloseCode, eventArgs.CloseMessage);
 
                     if (this._status == null)
                         await this.ConnectAsync().ConfigureAwait(false);
@@ -208,7 +206,7 @@ namespace DSharpPlus
                 }
                 else
                 {
-                    this.Logger.LogCritical(LoggerEvents.ConnectionClose, "Connection terminated ({0}, '{1}')", e.CloseCode, e.CloseMessage);
+                    this.Logger.LogCritical(LoggerEvents.ConnectionClose, "Connection terminated ({0}, '{1}')", eventArgs.CloseCode, eventArgs.CloseMessage);
                 }
             }
         }
@@ -253,10 +251,10 @@ namespace DSharpPlus
             }
         }
 
-        internal async Task OnHeartbeatAsync(long seq)
+        internal async Task OnHeartbeatAsync(long sequence)
         {
             this.Logger.LogTrace(LoggerEvents.WebSocketReceive, "Received HEARTBEAT (OP1)");
-            await this.SendHeartbeatAsync(seq).ConfigureAwait(false);
+            await this.SendHeartbeatAsync(sequence).ConfigureAwait(false);
         }
 
         internal async Task OnReconnectAsync()
@@ -359,53 +357,53 @@ namespace DSharpPlus
             if (activity != null && activity.Name != null && activity.Name.Length > 128)
                 throw new Exception("Game name can't be longer than 128 characters!");
 
-            var since_unix = idleSince != null ? (long?)Utilities.GetUnixTime(idleSince.Value) : null;
-            var act = activity ?? new DiscordActivity();
+            var sinceUnix = idleSince != null ? (long?)Utilities.GetUnixTime(idleSince.Value) : null;
+            var discordActivity = activity ?? new DiscordActivity();
 
             var status = new StatusUpdate
             {
-                Activity = new TransportActivity(act),
-                IdleSince = since_unix,
+                Activity = new TransportActivity(discordActivity),
+                IdleSince = sinceUnix,
                 IsAFK = idleSince != null,
                 Status = userStatus ?? UserStatus.Online
             };
 
             // Solution to have status persist between sessions
             this._status = status;
-            var status_update = new GatewayPayload
+            var statusUpdate = new GatewayPayload
             {
                 OpCode = GatewayOpCode.StatusUpdate,
                 Data = status
             };
 
-            var statusstr = JsonConvert.SerializeObject(status_update);
+            var statusString = JsonConvert.SerializeObject(statusUpdate);
 
-            await this.WsSendAsync(statusstr).ConfigureAwait(false);
+            await this.WsSendAsync(statusString).ConfigureAwait(false);
 
             if (!this._presences.ContainsKey(this.CurrentUser.Id))
             {
                 this._presences[this.CurrentUser.Id] = new DiscordPresence
                 {
                     Discord = this,
-                    Activity = act,
+                    Activity = discordActivity,
                     Status = userStatus ?? UserStatus.Online,
                     InternalUser = new TransportUser { Id = this.CurrentUser.Id }
                 };
             }
             else
             {
-                var pr = this._presences[this.CurrentUser.Id];
-                pr.Activity = act;
-                pr.Status = userStatus ?? pr.Status;
+                var userPresence = this._presences[this.CurrentUser.Id];
+                userPresence.Activity = discordActivity;
+                userPresence.Status = userStatus ?? userPresence.Status;
             }
         }
 
-        internal async Task SendHeartbeatAsync(long seq)
+        internal async Task SendHeartbeatAsync(long sequence)
         {
-            var more_than_5 = Volatile.Read(ref this._skippedHeartbeats) > 5;
-            var guilds_comp = Volatile.Read(ref this._guildDownloadCompleted);
+            var skippedMoreThanFiveHeartbeats = Volatile.Read(ref this._skippedHeartbeats) > 5;
+            var guildDownloadComplete = Volatile.Read(ref this._guildDownloadCompleted);
 
-            if (guilds_comp && more_than_5)
+            if (guildDownloadComplete && skippedMoreThanFiveHeartbeats)
             {
                 this.Logger.LogCritical(LoggerEvents.HeartbeatFailure, "Server failed to acknowledge more than 5 heartbeats - connection is zombie");
 
@@ -421,7 +419,7 @@ namespace DSharpPlus
                 return;
             }
 
-            if (!guilds_comp && more_than_5)
+            if (!guildDownloadComplete && skippedMoreThanFiveHeartbeats)
             {
                 var args = new ZombiedEventArgs
                 {
@@ -433,12 +431,12 @@ namespace DSharpPlus
                 this.Logger.LogWarning(LoggerEvents.HeartbeatFailure, "Server failed to acknowledge more than 5 heartbeats, but the guild download is still running - check your connection speed");
             }
 
-            Volatile.Write(ref this._lastSequence, seq);
+            Volatile.Write(ref this._lastSequence, sequence);
             this.Logger.LogTrace(LoggerEvents.Heartbeat, "Sending heartbeat");
             var heartbeat = new GatewayPayload
             {
                 OpCode = GatewayOpCode.Heartbeat,
-                Data = seq
+                Data = sequence
             };
             var heartbeat_str = JsonConvert.SerializeObject(heartbeat);
             await this.WsSendAsync(heartbeat_str).ConfigureAwait(false);
@@ -468,8 +466,8 @@ namespace DSharpPlus
                 OpCode = GatewayOpCode.Identify,
                 Data = identify
             };
-            var payloadstr = JsonConvert.SerializeObject(payload);
-            await this.WsSendAsync(payloadstr).ConfigureAwait(false);
+            var payloadString = JsonConvert.SerializeObject(payload);
+            await this.WsSendAsync(payloadString).ConfigureAwait(false);
 
             this.Logger.LogDebug(LoggerEvents.Intents, "Registered gateway intents ({0})", this.Configuration.Intents);
         }
@@ -482,14 +480,14 @@ namespace DSharpPlus
                 SessionId = this._sessionId,
                 SequenceNumber = Volatile.Read(ref this._lastSequence)
             };
-            var resume_payload = new GatewayPayload
+            var resumePayload = new GatewayPayload
             {
                 OpCode = GatewayOpCode.Resume,
                 Data = resume
             };
-            var resumestr = JsonConvert.SerializeObject(resume_payload);
+            var resumeString = JsonConvert.SerializeObject(resumePayload);
 
-            await this.WsSendAsync(resumestr).ConfigureAwait(false);
+            await this.WsSendAsync(resumeString).ConfigureAwait(false);
         }
         internal async Task InternalUpdateGatewayAsync()
         {

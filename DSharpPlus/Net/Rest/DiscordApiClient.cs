@@ -125,7 +125,7 @@ namespace DSharpPlus.Net
                 if (guild != null)
                 {
                     if (!guild.Members.TryGetValue(author.Id, out var mbr))
-                        mbr = new DiscordMember(usr) { Discord = this.Discord, _guild_id = guild.Id };
+                        mbr = new DiscordMember(usr) { Discord = this.Discord, _guildId = guild.Id };
                     ret.Author = mbr;
                 }
                 else
@@ -190,7 +190,7 @@ namespace DSharpPlus.Net
 
                 this.Discord.UpdateUserCache(usr);
 
-                mbrs.Add(new DiscordMember(xtm) { Discord = this.Discord, _guild_id = guild_id });
+                mbrs.Add(new DiscordMember(xtm) { Discord = this.Discord, _guildId = guild_id });
             }
 
             return mbrs;
@@ -311,7 +311,7 @@ namespace DSharpPlus.Net
             var rawMembers = (JArray)json["members"];
             var guild = json.ToDiscordObject<DiscordGuild>();
             foreach (var r in guild._roles.Values)
-                r._guild_id = guild.Id;
+                r._guildId = guild.Id;
 
             if (this.Discord is DiscordClient dc)
                 await dc.OnGuildUpdateEventAsync(guild, rawMembers).ConfigureAwait(false);
@@ -402,7 +402,7 @@ namespace DSharpPlus.Net
 
             var tm = JsonConvert.DeserializeObject<TransportMember>(res.Response);
 
-            return new DiscordMember(tm) { Discord = this.Discord, _guild_id = guild_id };
+            return new DiscordMember(tm) { Discord = this.Discord, _guildId = guild_id };
         }
 
         internal async Task<IReadOnlyList<TransportMember>> ListGuildMembersAsync(ulong guild_id, int? limit, ulong? after)
@@ -1577,7 +1577,7 @@ namespace DSharpPlus.Net
             return new DiscordMember(tm)
             {
                 Discord = this.Discord,
-                _guild_id = guild_id
+                _guildId = guild_id
             };
         }
 
@@ -1694,7 +1694,7 @@ namespace DSharpPlus.Net
             var url = Utilities.GetApiUriFor(path);
             var res = await this.DoRequestAsync(this.Discord, bucket, url, RestRequestMethod.GET, route).ConfigureAwait(false);
 
-            var roles_raw = JsonConvert.DeserializeObject<IEnumerable<DiscordRole>>(res.Response).Select(xr => { xr.Discord = this.Discord; xr._guild_id = guild_id; return xr; });
+            var roles_raw = JsonConvert.DeserializeObject<IEnumerable<DiscordRole>>(res.Response).Select(xr => { xr.Discord = this.Discord; xr._guildId = guild_id; return xr; });
 
             return new ReadOnlyCollection<DiscordRole>(new List<DiscordRole>(roles_raw));
         }
@@ -1715,7 +1715,7 @@ namespace DSharpPlus.Net
             var rawMembers = (JArray)json["members"];
             var guildRest = json.ToDiscordObject<DiscordGuild>();
             foreach (var r in guildRest._roles.Values)
-                r._guild_id = guildRest.Id;
+                r._guildId = guildRest.Id;
 
             if (this.Discord is DiscordClient dc)
             {
@@ -1752,7 +1752,7 @@ namespace DSharpPlus.Net
 
             var ret = JsonConvert.DeserializeObject<DiscordRole>(res.Response);
             ret.Discord = this.Discord;
-            ret._guild_id = guild_id;
+            ret._guildId = guild_id;
 
             return ret;
         }
@@ -1793,7 +1793,7 @@ namespace DSharpPlus.Net
 
             var ret = JsonConvert.DeserializeObject<DiscordRole>(res.Response);
             ret.Discord = this.Discord;
-            ret._guild_id = guild_id;
+            ret._guildId = guild_id;
 
             return ret;
         }

@@ -77,13 +77,13 @@ namespace DSharpPlus
         /// Gets the list of available voice regions. Note that this property will not contain VIP voice regions.
         /// </summary>
         public IReadOnlyDictionary<string, DiscordVoiceRegion> VoiceRegions
-            => this._voice_regions_lazy.Value;
+            => this._voiceRegionsLazy.Value;
 
         /// <summary>
         /// Gets the list of available voice regions. This property is meant as a way to modify <see cref="VoiceRegions"/>.
         /// </summary>
         protected internal ConcurrentDictionary<string, DiscordVoiceRegion> InternalVoiceRegions { get; set; }
-        internal Lazy<IReadOnlyDictionary<string, DiscordVoiceRegion>> _voice_regions_lazy;
+        internal Lazy<IReadOnlyDictionary<string, DiscordVoiceRegion>> _voiceRegionsLazy;
 
         /// <summary>
         /// Initializes this Discord API client.
@@ -103,22 +103,22 @@ namespace DSharpPlus
             this.ApiClient = new DiscordApiClient(this);
             this.UserCache = new ConcurrentDictionary<ulong, DiscordUser>();
             this.InternalVoiceRegions = new ConcurrentDictionary<string, DiscordVoiceRegion>();
-            this._voice_regions_lazy = new Lazy<IReadOnlyDictionary<string, DiscordVoiceRegion>>(() => new ReadOnlyDictionary<string, DiscordVoiceRegion>(this.InternalVoiceRegions));
+            this._voiceRegionsLazy = new Lazy<IReadOnlyDictionary<string, DiscordVoiceRegion>>(() => new ReadOnlyDictionary<string, DiscordVoiceRegion>(this.InternalVoiceRegions));
 
-            var a = typeof(DiscordClient).GetTypeInfo().Assembly;
+            var clientAssembly = typeof(DiscordClient).GetTypeInfo().Assembly;
 
-            var iv = a.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-            if (iv != null)
+            var clientCustomAttribute = clientAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            if (clientCustomAttribute != null)
             {
-                this.VersionString = iv.InformationalVersion;
+                this.VersionString = clientCustomAttribute.InformationalVersion;
             }
             else
             {
-                var v = a.GetName().Version;
-                var vs = v.ToString(3);
+                var clientVersion = clientAssembly.GetName().Version;
+                var threeNumberedVersion = clientVersion.ToString(3);
 
-                if (v.Revision > 0)
-                    this.VersionString = $"{vs}, CI build {v.Revision}";
+                if (clientVersion.Revision > 0)
+                    this.VersionString = $"{threeNumberedVersion}, CI build {clientVersion.Revision}";
             }
         }
 
@@ -128,54 +128,54 @@ namespace DSharpPlus
         /// <returns>Current API application.</returns>
         public async Task<DiscordApplication> GetCurrentApplicationAsync()
         {
-            var tapp = await this.ApiClient.GetCurrentApplicationInfoAsync().ConfigureAwait(false);
-            var app = new DiscordApplication
+            var transportApplication = await this.ApiClient.GetCurrentApplicationInfoAsync().ConfigureAwait(false);
+            var application = new DiscordApplication
             {
                 Discord = this,
-                Id = tapp.Id,
-                Name = tapp.Name,
-                Description = tapp.Description,
-                Summary = tapp.Summary,
-                IconHash = tapp.IconHash,
-                TermsOfServiceUrl = tapp.TermsOfServiceUrl,
-                PrivacyPolicyUrl = tapp.PrivacyPolicyUrl,
-                RpcOrigins = tapp.RpcOrigins != null ? new ReadOnlyCollection<string>(tapp.RpcOrigins) : null,
-                Flags = tapp.Flags,
-                RequiresCodeGrant = tapp.BotRequiresCodeGrant,
-                IsPublic = tapp.IsPublicBot,
+                Id = transportApplication.Id,
+                Name = transportApplication.Name,
+                Description = transportApplication.Description,
+                Summary = transportApplication.Summary,
+                IconHash = transportApplication.IconHash,
+                TermsOfServiceUrl = transportApplication.TermsOfServiceUrl,
+                PrivacyPolicyUrl = transportApplication.PrivacyPolicyUrl,
+                RpcOrigins = transportApplication.RpcOrigins != null ? new ReadOnlyCollection<string>(transportApplication.RpcOrigins) : null,
+                Flags = transportApplication.Flags,
+                RequiresCodeGrant = transportApplication.BotRequiresCodeGrant,
+                IsPublic = transportApplication.IsPublicBot,
                 CoverImageHash = null
             };
 
             // do team and owners
             // tbh fuck doing this properly
-            if (tapp.Team == null)
+            if (transportApplication.Team == null)
             {
                 // singular owner
 
-                app.Owners = new ReadOnlyCollection<DiscordUser>(new[] { new DiscordUser(tapp.Owner) });
-                app.Team = null;
+                application.Owners = new ReadOnlyCollection<DiscordUser>(new[] { new DiscordUser(transportApplication.Owner) });
+                application.Team = null;
             }
             else
             {
                 // team owner
 
-                app.Team = new DiscordTeam(tapp.Team);
+                application.Team = new DiscordTeam(transportApplication.Team);
 
-                var members = tapp.Team.Members
-                    .Select(x => new DiscordTeamMember(x) { Team = app.Team, User = new DiscordUser(x.User) })
+                var members = transportApplication.Team.Members
+                    .Select(member => new DiscordTeamMember(member) { Team = application.Team, User = new DiscordUser(member.User) })
                     .ToArray();
 
                 var owners = members
-                    .Where(x => x.MembershipStatus == DiscordTeamMembershipStatus.Accepted)
-                    .Select(x => x.User)
+                    .Where(member => member.MembershipStatus == DiscordTeamMembershipStatus.Accepted)
+                    .Select(member => member.User)
                     .ToArray();
 
-                app.Owners = new ReadOnlyCollection<DiscordUser>(owners);
-                app.Team.Owner = owners.FirstOrDefault(x => x.Id == tapp.Team.OwnerId);
-                app.Team.Members = new ReadOnlyCollection<DiscordTeamMember>(members);
+                application.Owners = new ReadOnlyCollection<DiscordUser>(owners);
+                application.Team.Owner = owners.FirstOrDefault(owner => owner.Id == transportApplication.Team.OwnerId);
+                application.Team.Members = new ReadOnlyCollection<DiscordTeamMember>(members);
             }
 
-            return app;
+            return application;
         }
 
         /// <summary>
@@ -203,9 +203,9 @@ namespace DSharpPlus
 
             if (this.Configuration.TokenType != TokenType.Bearer && this.InternalVoiceRegions.Count == 0)
             {
-                var vrs = await this.ListVoiceRegionsAsync().ConfigureAwait(false);
-                foreach (var xvr in vrs)
-                    this.InternalVoiceRegions.TryAdd(xvr.Id, xvr);
+                var voiceRegions = await this.ListVoiceRegionsAsync().ConfigureAwait(false);
+                foreach (var voiceRegion in voiceRegions)
+                    this.InternalVoiceRegions.TryAdd(voiceRegion.Id, voiceRegion);
             }
         }
 
@@ -226,37 +226,37 @@ namespace DSharpPlus
 
                 this.Configuration.Token = token;
 
-                var res = await this.ApiClient.GetGatewayInfoAsync().ConfigureAwait(false);
+                var getawayInfo = await this.ApiClient.GetGatewayInfoAsync().ConfigureAwait(false);
                 this.Configuration.Token = null;
-                return res;
+                return getawayInfo;
             }
 
             return await this.ApiClient.GetGatewayInfoAsync().ConfigureAwait(false);
         }
 
-        internal DiscordUser GetCachedOrEmptyUserInternal(ulong user_id)
+        internal DiscordUser GetCachedOrEmptyUserInternal(ulong userId)
         {
-            this.TryGetCachedUserInternal(user_id, out var user);
+            this.TryGetCachedUserInternal(userId, out var user);
             return user;
         }
 
-        internal bool TryGetCachedUserInternal(ulong user_id, out DiscordUser user)
+        internal bool TryGetCachedUserInternal(ulong userId, out DiscordUser user)
         {
-            if (this.UserCache.TryGetValue(user_id, out user))
+            if (this.UserCache.TryGetValue(userId, out user))
                 return true;
 
-            user = new DiscordUser { Id = user_id, Discord = this };
+            user = new DiscordUser { Id = userId, Discord = this };
             return false;
         }
 
         internal DiscordUser UpdateUserCache(DiscordUser newUser)
         {
-            return this.UserCache.AddOrUpdate(newUser.Id, newUser, (id, old) =>
+            return this.UserCache.AddOrUpdate(newUser.Id, newUser, (id, oldUser) =>
             {
-                old.Username = newUser.Username;
-                old.Discriminator = newUser.Discriminator;
-                old.AvatarHash = newUser.AvatarHash;
-                return old;
+                oldUser.Username = newUser.Username;
+                oldUser.Discriminator = newUser.Discriminator;
+                oldUser.AvatarHash = newUser.AvatarHash;
+                return oldUser;
             });
         }
 

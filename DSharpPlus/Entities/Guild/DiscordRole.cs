@@ -88,7 +88,7 @@ namespace DSharpPlus.Entities
         public DiscordRoleTags Tags { get; internal set; }
 
         [JsonIgnore]
-        internal ulong _guild_id = 0;
+        internal ulong _guildId = 0;
 
         /// <summary>
         /// Gets a mention string for this role. If the role is mentionable, this string will mention all the users that belong to this role.
@@ -109,7 +109,7 @@ namespace DSharpPlus.Entities
         /// <exception cref="Exceptions.ServerErrorException">Thrown when Discord is unable to process the request.</exception>
         public Task ModifyPositionAsync(int position, string reason = null)
         {
-            var roles = this.Discord.Guilds[this._guild_id].Roles.Values.OrderByDescending(xr => xr.Position).ToArray();
+            var roles = this.Discord.Guilds[this._guildId].Roles.Values.OrderByDescending(xr => xr.Position).ToArray();
             var pmds = new RestGuildRoleReorderPayload[roles.Length];
             for (var i = 0; i < roles.Length; i++)
             {
@@ -118,7 +118,7 @@ namespace DSharpPlus.Entities
                 pmds[i].Position = roles[i].Id == this.Id ? position : roles[i].Position <= position ? roles[i].Position - 1 : roles[i].Position;
             }
 
-            return this.Discord.ApiClient.ModifyGuildRolePositionAsync(this._guild_id, pmds, reason);
+            return this.Discord.ApiClient.ModifyGuildRolePositionAsync(this._guildId, pmds, reason);
         }
 
         /// <summary>
@@ -136,7 +136,7 @@ namespace DSharpPlus.Entities
         /// <exception cref="Exceptions.BadRequestException">Thrown when an invalid parameter was provided.</exception>
         /// <exception cref="Exceptions.ServerErrorException">Thrown when Discord is unable to process the request.</exception>
         public Task ModifyAsync(string name = null, Permissions? permissions = null, DiscordColor? color = null, bool? hoist = null, bool? mentionable = null, string reason = null)
-            => this.Discord.ApiClient.ModifyGuildRoleAsync(this._guild_id, this.Id, name, permissions, color?.Value, hoist, mentionable, reason);
+            => this.Discord.ApiClient.ModifyGuildRoleAsync(this._guildId, this.Id, name, permissions, color?.Value, hoist, mentionable, reason);
 
         /// <exception cref = "Exceptions.UnauthorizedException" > Thrown when the client does not have the<see cref="Permissions.ManageRoles"/> permission.</exception>
         /// <exception cref="Exceptions.NotFoundException">Thrown when the role does not exist.</exception>
@@ -159,7 +159,7 @@ namespace DSharpPlus.Entities
         /// <exception cref="Exceptions.NotFoundException">Thrown when the role does not exist.</exception>
         /// <exception cref="Exceptions.BadRequestException">Thrown when an invalid parameter was provided.</exception>
         /// <exception cref="Exceptions.ServerErrorException">Thrown when Discord is unable to process the request.</exception>
-        public Task DeleteAsync(string reason = null) => this.Discord.ApiClient.DeleteRoleAsync(this._guild_id, this.Id, reason);
+        public Task DeleteAsync(string reason = null) => this.Discord.ApiClient.DeleteRoleAsync(this._guildId, this.Id, reason);
         #endregion
 
         internal DiscordRole() { }
